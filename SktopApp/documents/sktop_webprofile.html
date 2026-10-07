@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKTOP | Industrial Management Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .bg-sktop-silver { background: linear-gradient(to bottom, #f8f9fa 0%, #d1d5db 100%); border: 1px solid #9ca3af; }
+        .hero-overlay { background: linear-gradient(rgba(229,225,230,0.4), rgba(229,225,230,0.2)); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Floating Button Animation */
+        .whatsapp-float {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .whatsapp-float:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased text-slate-900 flex flex-col min-h-screen" 
+      x-data="{ 
+        view: 'home', 
+        whatsappNumber: '60123456789', // REPLACE THIS WITH YOUR ACTUAL NUMBER
+        adminTab: 'orders',				   
+        mobileMenu: false,
+        isLoggedIn: false,
+        isAdmin: false,
+        editMode: false,
+        customerEditMode: false,
+        showOrderDetails: false,
+        editingProduct: null,
+        editingCustomer: null,
+        selectedOrder: null,
+        currentUser: null,
+        selectedCategory: 'All',
+        selectedAssetType: 'Product',
+
+        reportFilter: {
+            year: '2026',
+            customer: [], 
+            status: '',
+		    productType: '',					
+            custSearch: '' 
+        },
+
+        toggleCustFilter(name) {
+            if (this.reportFilter.customer.includes(name)) {
+                this.reportFilter.customer = this.reportFilter.customer.filter(c => c !== name);
+            } else {
+                this.reportFilter.customer.push(name);
+            }
+            this.reportFilter.custSearch = ''; 
+        },
+
+        categories: ['Tools', 'Hardware', 'Safety', 'Machinery'],
+        newCategoryName: '',
+        products: [
+            { id: 1, type: 'Product', name: 'HEAVY DUTY IMPACT SOCKET', minPrice: 110.00, maxPrice: 130.00, qty: 50, category: 'Tools', desc: 'Industrial-grade durability for heavy-duty environments.', images: [] },
+            { id: 2, type: 'Product', name: 'PRECISION PRESSURE GAUGE', minPrice: 80.00, maxPrice: 95.00, qty: 25, category: 'Hardware', desc: 'High-accuracy monitoring for maintenance.', images: [] }
+        ],
+        orders: [
+            { id: 'ORD-8821', customer: 'Global Workshop Ltd', status: 'Pending', date: '2026-03-13', items: [{name: 'Impact Socket', type: 'Product', category: 'Tools', qty: 3, minPrice: 110, maxPrice: 130}, {name: 'Rim Protector', type: 'Gift', category: 'Hardware', qty: 13, minPrice: 5, maxPrice: 8}] },
+            { id: 'ORD-9042', customer: 'Titan Manufacturing', status: 'Shipped', date: '2026-03-15', items: [{name: 'Pressure Gauge', type: 'Product', category: 'Hardware', qty: 10, minPrice: 80, maxPrice: 95}, {name: 'Hydraulic Seal', type: 'Product', category: 'Machinery', qty: 1, minPrice: 380, maxPrice: 420}] },
+            { id: 'ORD-1150', customer: 'Global Workshop Ltd', status: 'Delivered', date: '2025-11-20', items: [{name: 'Impact Socket', type: 'Product', category: 'Tools', qty: 2, minPrice: 110, maxPrice: 130}] },
+        ],
+        customers: [
+            { id: 1, company: 'Global Workshop Ltd', email: 'client@global.com', password: 'password123', category: ['Tools'] },
+            { id: 2, company: 'Titan Manufacturing', email: 'admin@titan.com', password: 'password456', category: ['Hardware', 'Safety'] },
+            { id: 3, company: 'Kleenex', email: 'kleen@test.com', password: 'pass', category: ['Tools'] },
+            { id: 4, company: 'Kleenex2', email: 'kleen2@test.com', password: 'pass', category: ['Tools'] }
+        ],
+        cart: [],
+
+        newProduct: { type: 'Product', category: 'Tools', name: '', desc: '', qty: 1, minPrice: 0, maxPrice: 0, images: [] },
+        newCustomer: { company: '', email: '', password: '', category: [] },
+
+        handleImageUpload(event, target = 'new') {
+            const files = Array.from(event.target.files).slice(0, 3);
+            const imageArray = [];
+            
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => { 
+                    imageArray.push(e.target.result);
+                    if (target === 'new') {
+                        this.newProduct.images = [...imageArray];
+                    } else {
+                        this.editingProduct.images = [...imageArray];
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        },
+        toggleAllCategories(target) {
+            const targetObj = target === 'new' ? this.newCustomer : this.editingCustomer;
+            if (targetObj.category.length === this.categories.length) {
+                targetObj.category = [];
+            } else {
+                targetObj.category = [...this.categories];
+            }
+        },
+
+        toggleCategory(cat, target) {
+            const targetObj = target === 'new' ? this.newCustomer : this.editingCustomer;
+            if (targetObj.category.includes(cat)) {
+                targetObj.category = targetObj.category.filter(c => c !== name);
+            } else {
+                targetObj.category.push(cat);
+            }
+        },
+
+        loginUser(email, pass) {
+            const user = this.customers.find(c => c.email === email && c.password === pass);
+            if (user) {
+                this.currentUser = user.company;
+                this.isLoggedIn = true;
+                this.isAdmin = false;
+                this.view = 'store';
+                this.mobileMenu = false;
+                this.selectedCategory = 'All';
+                this.selectedAssetType = 'Product';
+            } else {
+                alert('Invalid Credentials');
+            }
+        },
+
+        adminLogin(pass) {
+            if (pass === 'admin123') {
+                this.isAdmin = true;
+                this.isLoggedIn = false;
+                this.view = 'admin-dashboard';
+                this.mobileMenu = false;
+            } else {
+                alert('Access Denied');
+            }
+        },
+
+        get filteredOrders() {
+            return this.orders.filter(o => {
+                const matchesYear = this.reportFilter.year === '' || o.date.startsWith(this.reportFilter.year);
+                const matchesCustomer = this.reportFilter.customer.length === 0 || this.reportFilter.customer.includes(o.customer);
+                const matchesStatus = this.reportFilter.status === '' || o.status === this.reportFilter.status;
+                // Enhanced filtering logic for Product Type
+                const matchesType = this.reportFilter.productType === '' || o.items.some(item => item.type === this.reportFilter.productType);
+                return matchesYear && matchesCustomer && matchesStatus && matchesType;
+            });
+        },
+
+        exportToExcel() {
+            let csv = 'Order Number,Order Date,Customer Name,Status,Product Types Included\n';
+            // Export uses the corrected filtered list
+            this.filteredOrders.forEach(o => {
+                const types = [...new Set(o.items.map(i => i.type))].join(' & ');
+                csv += `${o.id},${o.date},${o.customer},${o.status},${types}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `SKTOP_Report_${this.reportFilter.year || 'All'}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        },
+
+        addCategory() {
+            if (this.newCategoryName.trim() !== '' && !this.categories.includes(this.newCategoryName)) {
+                this.categories.push(this.newCategoryName.trim());
+                this.newCategoryName = '';
+            }
+        },
+        deleteCategory(cat) {
+            if(confirm('Delete this category? Products already assigned will remain.')) {
+                this.categories = this.categories.filter(c => c !== cat);
+            }
+        },
+        addProduct() {
+            this.products.push({...this.newProduct, id: Date.now()});
+            this.newProduct = { type: 'Product', category: 'Tools', name: '', desc: '', qty: 1, minPrice: 0, maxPrice: 0, images: []  };
+        },
+        startEdit(product) {
+            this.editingProduct = JSON.parse(JSON.stringify(product));
+            if (!this.editingProduct.type) this.editingProduct.type = 'Product';
+		 if (!this.editingProduct.images) this.editingProduct.images = [];																	 
+            this.editMode = true;
+        },
+        saveEdit() {
+            const index = this.products.findIndex(p => p.id === this.editingProduct.id);
+            if(index !== -1) {
+                this.products[index] = {...this.editingProduct};
+                this.editMode = false;
+            }
+        },
+        deleteProduct(id) {
+            if(confirm('Confirm deletion of this asset?')) {
+                this.products = this.products.filter(p => p.id !== id);
+            }
+        },
+        createCustomer() {
+            this.customers.push({...this.newCustomer, id: Date.now()});
+            this.newCustomer = { company: '', email: '', password: '', category: [] };
+        },
+        startCustomerEdit(customer) {
+            this.editingCustomer = JSON.parse(JSON.stringify(customer));
+            if (!Array.isArray(this.editingCustomer.category)) {
+                this.editingCustomer.category = this.editingCustomer.category ? [this.editingCustomer.category] : [];
+            }
+            this.customerEditMode = true;
+        },
+        saveCustomerEdit() {
+            const index = this.customers.findIndex(c => c.id === this.editingCustomer.id);
+            if(index !== -1) {
+                this.customers[index] = {...this.editingCustomer};
+                this.customerEditMode = false;
+            }
+        },
+        deleteCustomer(id) {
+            if(confirm('Permanently remove this customer profile?')) {
+                this.customers = this.customers.filter(c => c.id !== id);
+            }
+        },
+        addToCart(product) {
+            const existing = this.cart.find(item => item.id === product.id);
+            if(existing) {
+                existing.cartQty++;
+            } else {
+                this.cart.push({...product, cartQty: 1});
+            }
+            alert(product.name + ' added to orders.');
+        },
+        removeFromCart(id) {
+            this.cart = this.cart.filter(item => item.id !== id);
+        },
+        submitOrder() {
+            if(this.cart.length === 0) return;
+            const newOrder = {
+                id: 'ORD-' + Math.floor(1000 + Math.random() * 9000),
+                customer: this.currentUser,
+                status: 'Pending',
+                date: new Date().toISOString().split('T')[0],
+                items: this.cart.map(i => ({ 
+                    name: i.name, 
+                    type: i.type,
+                    category: i.category, 
+                    qty: i.cartQty, 
+                    minPrice: i.minPrice, 
+                    maxPrice: i.maxPrice 
+                }))
+            };
+            this.orders.push(newOrder);
+            this.cart = [];
+            this.view = 'history';
+            alert('Order ' + newOrder.id + ' submitted.');
+        },
+        updateOrderStatus(orderId) {
+            const order = this.orders.find(o => o.id === orderId);
+            if (order.status === 'Pending') order.status = 'Shipped';
+            else if (order.status === 'Shipped') order.status = 'Delivered';
+            else order.status = 'Pending';
+        },
+        viewOrderDetails(order) {
+            this.selectedOrder = order;
+            this.showOrderDetails = true;
+        },
+        updateAdminItemQty(orderId, itemName, newQty) {
+            const order = this.orders.find(o => o.id === orderId);
+            if (!order || order.status !== 'Pending') return;
+            
+            const item = order.items.find(i => i.name === itemName);
+            if (item) {
+                item.qty = Math.max(1, parseInt(newQty) || 1);
+            }
+        }
+      }">
+
+<div class="fixed bottom-24 right-6 z-[100]" x-show="!isAdmin">
+    <a :href="'https://wa.me/' + whatsappNumber + '?text=Hi SKTOP, I have a general inquiry about your services.'" 
+       target="_blank" 
+       class="whatsapp-float bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl">
+        <i class="fab fa-whatsapp text-3xl"></i>
+    </a>
+</div>
+
+<nav class="bg-white border-b border-gray-300 shadow-sm sticky top-0 z-50" style="background-color: #ffd700;">
+    <div class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
+        <div class="flex flex-col cursor-pointer" @click="if(!isAdmin) { view = 'home'; mobileMenu = false }">
+            <span class="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none" style="color: #644117">SKTOP</span>
+            <span class="text-[8px] md:text-[10px] font-bold uppercase text-gray-500 tracking-widest mt-1" style="color: #644117;">Industrial Solutions</span>
+        </div>
+        
+        <div class="hidden md:flex items-center space-x-8 text-sm font-bold uppercase tracking-tighter">
+            <button x-show="!isAdmin" @click="view = 'home'" :class="view === 'home' ? 'text-black underline' : 'text-gray-400 hover:text-black'">Home</button>
+            
+            <button x-show="!isAdmin" @click="view = 'about'" :class="view === 'about' ? 'text-black underline' : 'text-gray-400 hover:text-black'">About Us</button>																																									 
+            <button x-show="!isAdmin" @click="view = 'store'" :class="view === 'store' ? 'text-black underline' : 'text-gray-400 hover:text-black'">Products</button>
+            <button x-show="isLoggedIn && !isAdmin" @click="view = 'history'" :class="view === 'history' ? 'text-black underline' : 'text-gray-400 hover:text-black'">Orders</button>
+            
+
+            <template x-if="isAdmin">
+                <button @click="view = 'admin-dashboard'" class="bg-red-600 text-white px-5 py-2 rounded text-xs font-black">Admin Panel</button>
+            </template>
+            <button x-show="!isLoggedIn && !isAdmin" @click="view = 'login'" 
+                    class="text-white px-5 py-2 rounded text-xs font-black" 
+                    style="background-color: #644117;">Login</button>
+            <button x-show="isLoggedIn || isAdmin" @click="isLoggedIn=false; isAdmin=false; view='home'" class="text-gray-400 text-xs font-black uppercase">Logout</button>
+        </div>
+
+        <div class="md:hidden flex items-center">
+            <button @click="mobileMenu = !mobileMenu" class="text-black focus:outline-none">
+                <svg x-show="!mobileMenu" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                <svg x-show="mobileMenu" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <div x-show="mobileMenu" x-cloak class="md:hidden bg-white border-b border-gray-200 py-4 px-6 space-y-4 flex flex-col text-xs font-black uppercase tracking-widest" style="background-color: #ffd700;">
+        <button x-show="!isAdmin" @click="view = 'home'; mobileMenu = false">Home</button>
+        
+        <button x-show="!isAdmin" @click="view = 'about'; mobileMenu = false">About Us</button>																							   
+        <button x-show="!isAdmin" @click="view = 'store'; mobileMenu = false">Products</button>
+        <button x-show="isLoggedIn && !isAdmin" @click="view = 'history'; mobileMenu = false">Orders</button>
+
+        <template x-if="isAdmin">
+            <button @click="view = 'admin-dashboard'; mobileMenu = false" class="text-red-600">Admin Panel</button>
+        </template>
+        <button x-show="!isLoggedIn && !isAdmin" @click="view = 'login'; mobileMenu = false" class="bg-black text-white py-3 rounded text-center">Login</button>
+        <button x-show="isLoggedIn || isAdmin" @click="isLoggedIn=false; isAdmin=false; view='home'; mobileMenu = false" class="text-gray-400">Logout</button>
+    </div>
+</nav>
+
+    <main x-show="view === 'home' && !isAdmin" x-cloak class="flex-grow flex items-center justify-center relative min-h-[400px] md:min-h-[500px]" style="background-color: #E5E1E6;">
+        <div class="absolute inset-0 hero-overlay z-10"></div>
+        <img src="carBanner2.jpg" class="absolute inset-0 w-full h-full object-cover opacity-40">
+        <div class="relative z-20 text-center px-4">
+            <h1 class="text-4xl md:text-7xl font-black uppercase tracking-tighter italic leading-none mb-6" style="color: #644117;">SKTOP <br> INDUSTRIAL.</h1>
+            <button @click="view = 'store'" 
+                class="text-white px-8 md:px-12 py-4 md:py-5 font-black uppercase text-[10px] md:text-xs tracking-widest hover:opacity-90 transition" 
+                style="background-color: #644117;">Enter Inventory</button>
+        </div>
+    </main>
+
+    <main x-show="view === 'about'" x-cloak class="flex-grow py-8 md:py-20 bg-white">
+        <div class="max-w-5xl mx-auto px-6">
+            <div class="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div>
+                    <h2 class="text-[9px] font-black uppercase text-red-600 tracking-[0.3em] mb-4">Company Profile</h2>
+                    <h1 class="text-3xl md:text-5xl font-black uppercase tracking-tighter italic leading-tight mb-6">Pioneering Industrial <br class="hidden md:block"> Excellence Since 1998.</h1>
+                    <p class="text-gray-600 text-xs md:text-sm leading-relaxed mb-6 font-medium">
+                        SKTOP Industrial Solutions started as a small hardware consultancy in the heart of the manufacturing district. Today, we are a leading provider of high-precision tools, heavy machinery, and safety equipment for the global industrial sector.
+                    </p>
+                    <div class="grid grid-cols-2 gap-4 border-t border-gray-100 pt-8">
+                        <div>
+                            <span class="block text-xl md:text-2xl font-black tracking-tighter">500+</span>
+                            <span class="text-[8px] uppercase font-bold text-gray-400 tracking-widest">Global Clients</span>
+                        </div>
+                        <div>
+                            <span class="block text-xl md:text-2xl font-black tracking-tighter">25+</span>
+                            <span class="text-[8px] uppercase font-bold text-gray-400 tracking-widest">Years Experience</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-100 rounded-3xl p-6 md:p-8 border border-gray-200 shadow-inner">
+                    <h3 class="text-[10px] font-black uppercase mb-4 tracking-widest">Our Mission</h3>
+                    <p class="text-gray-500 text-[11px] italic leading-relaxed mb-8">
+                        "To empower modern industry with reliable, high-performance assets that ensure safety, precision, and peak operational efficiency."
+                    </p>
+                    <ul class="space-y-3">
+                        <template x-for="(goal, index) in ['Certified Durability', 'Rapid Fulfillment', 'Precision Engineering']">
+                            <li class="flex items-start space-x-3">
+                                <span class="bg-black text-white text-[7px] font-black px-2 py-1 rounded" x-text="'0'+(index+1)"></span>
+                                <span class="text-[9px] font-black uppercase" x-text="goal"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <main x-show="view === 'login'" x-cloak class="flex-grow flex flex-col md:flex-row bg-gray-100">
+        <div class="flex-1 bg-white p-8 md:p-16 flex flex-col justify-center items-center">
+            <div class="w-full max-sm:max-w-xs">
+                <h2 class="text-2xl font-black uppercase tracking-tighter italic mb-8 border-b-4 inline-block" style="border-color: #644117;">Client Authorization</h2>
+                <form @submit.prevent="loginUser($el.email.value, $el.pass.value)" class="space-y-4">
+                    <input name="email" type="email" placeholder="Email" required class="w-full border p-4 rounded-xl font-bold text-sm">
+                    <input name="pass" type="password" placeholder="Password" required class="w-full border p-4 rounded-xl font-bold text-sm">
+                    <button type="submit" class="w-full text-white py-4 rounded-xl font-black uppercase text-[10px]" 
+                style="background-color: #644117;">Authorize Access</button>
+                </form>
+            </div>
+        </div>
+        <div class="flex-1 bg-zinc-900 text-white p-8 md:p-16 flex flex-col justify-center items-center">
+            <div class="w-full max-sm:max-w-xs">
+                <h2 class="text-2xl font-black uppercase tracking-tighter italic mb-8 border-b-4 border-red-600 inline-block">Root Terminal</h2>
+                <form @submit.prevent="adminLogin($el.pass.value)" class="space-y-4">
+                    <input name="pass" type="password" placeholder="Terminal Passcode" required class="w-full bg-zinc-800 border-zinc-700 border p-4 rounded-xl font-bold text-sm text-white">
+                    <button type="submit" class="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase text-[10px]">Initialize Root</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <main x-show="view === 'history'" x-cloak class="flex-grow py-8 md:py-16 bg-gray-50 px-4">
+        <div class="max-w-3xl mx-auto">
+            <h1 class="text-2xl font-black uppercase mb-8">Order History</h1>
+            <template x-for="order in orders.filter(o => o.customer === currentUser)" :key="order.id">
+                <div class="bg-white border p-6 rounded-2xl mb-4 shadow-sm flex justify-between items-center">
+                    <div>
+                        <span class="text-[10px] font-black text-gray-400 block" x-text="order.date"></span>
+                        <h3 class="font-black" x-text="order.id"></h3>
+                        <span :class="order.status === 'Delivered' ? 'text-green-600' : 'text-amber-600'" class="text-[8px] font-black uppercase" x-text="order.status"></span>
+                    </div>
+                    <div class="text-right">
+                        <button @click="viewOrderDetails(order)" class="text-[9px] font-black uppercase border-b-2 border-black">View Details</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+<main x-show="view === 'admin-dashboard'" x-cloak class="flex-grow py-6 md:py-12 bg-gray-100">
+    <div class="max-w-7xl mx-auto px-4 md:px-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <h1 class="text-xl md:text-3xl font-black uppercase tracking-tighter italic underline decoration-red-600">Admin Control Center</h1>
+            
+            <div class="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+                <button @click="adminTab = 'orders'" 
+                        :class="adminTab === 'orders' ? 'bg-black text-white' : 'text-gray-400 hover:text-black'"
+                        class="px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap">
+                    Order Ledger
+                </button>
+                <button @click="adminTab = 'reports'" 
+                        :class="adminTab === 'reports' ? 'bg-black text-white' : 'text-gray-400 hover:text-black'"
+                        class="px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap">
+                    Reports
+                </button>
+                <button @click="adminTab = 'inventory'" 
+                        :class="adminTab === 'inventory' ? 'bg-black text-white' : 'text-gray-400 hover:text-black'"
+                        class="px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap">
+                    Inventory Control
+                </button>
+                <button @click="adminTab = 'crm'" 
+                        :class="adminTab === 'crm' ? 'bg-black text-white' : 'text-gray-400 hover:text-black'"
+                        class="px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all whitespace-nowrap">
+                    Customer CRM
+                </button>
+            </div>
+        </div>
+
+<section x-show="adminTab === 'orders'" x-transition>
+    <h2 class="text-[9px] font-black uppercase text-green-600 mb-4 tracking-[0.2em]">Live Order Ledger</h2>
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left min-w-[500px]">
+                <thead class="bg-gray-50 border-b">
+                    <tr>
+                        <th class="p-3 text-[9px] font-black uppercase text-gray-400">Order ID</th>
+                        <th class="p-3 text-[9px] font-black uppercase text-gray-400">Order Date</th>
+                        <th class="p-3 text-[9px] font-black uppercase text-gray-400">Client</th>
+                        <th class="p-3 text-[9px] font-black uppercase text-gray-400">Product Type</th>
+                        <th class="p-3 text-[9px] font-black uppercase text-gray-400 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="order in orders" :key="order.id">
+                        <tr class="border-b hover:bg-gray-50 transition">
+                            <td class="p-3 text-[11px] font-bold" x-text="order.id"></td>
+                            <td class="p-3 text-[11px] font-bold text-gray-500" x-text="order.date"></td>
+                            <td class="p-3 text-[11px] font-bold" x-text="order.customer"></td>
+                            <td class="p-3">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="type in [...new Set(order.items.map(i => i.type))]" :key="type">
+                                        <span :class="type === 'Gift' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'" 
+                                              class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded border" x-text="type"></span>
+                                    </template>
+                                </div>
+                            </td>
+                            <td class="p-3 text-right space-x-1">
+                                <button @click="viewOrderDetails(order)" class="text-[8px] font-black uppercase border-b-2 border-green-600 text-green-600">Details</button>
+                                <button @click="updateOrderStatus(order.id)" class="text-[8px] font-black uppercase border-b-2 border-black" x-text="'Set ' + (order.status === 'Pending' ? 'Shipped' : (order.status === 'Shipped' ? 'Delivered' : 'Pending'))"></button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section x-show="adminTab === 'reports'" x-transition>
+    <div class="flex justify-between items-end mb-6">
+        <h2 class="text-[9px] font-black uppercase text-red-600 tracking-[0.2em]">Annual Order Reports</h2>
+        <button @click="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-[9px] font-black uppercase shadow-sm hover:bg-green-700 transition">Export to Excel (.csv)</button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative">
+        <div>
+            <label class="text-[8px] font-black uppercase text-gray-400 block mb-1 ml-1">Order Year</label>
+            <select x-model="reportFilter.year" class="w-full border p-2.5 rounded-xl text-[10px] font-bold">
+                <option value="">All Years</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+            </select>
+        </div>
+
+        <div class="relative group md:col-span-1" x-data="{ openSuggestions: false }">
+            <label class="text-[8px] font-black uppercase text-gray-400 block mb-1 ml-1">Customer Name</label>
+            <div class="relative flex items-center">
+                <input 
+                    x-model="reportFilter.custSearch" 
+                    type="text" 
+                    placeholder="Search client..." 
+                    @focus="openSuggestions = true"
+                    @click.away="openSuggestions = false"
+                    class="w-full border p-2.5 rounded-xl text-[10px] font-bold focus:ring-1 focus:ring-red-300"
+                >
+            </div>
+            
+            <div x-show="openSuggestions" class="absolute left-0 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl z-50 max-h-60 overflow-y-auto" x-cloak>
+                <template x-for="cust in customers.filter(c => c.company.toLowerCase().includes(reportFilter.custSearch.toLowerCase()))" :key="cust.id">
+                    <div @click="toggleCustFilter(cust.company)"
+                         :class="reportFilter.customer.includes(cust.company) ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-100'"
+                         class="p-3 border-b last:border-0 text-[11px] font-bold cursor-pointer flex justify-between items-center transition">
+                        <span x-text="cust.company"></span>
+                        <span x-show="reportFilter.customer.includes(cust.company)" class="font-black text-xs text-red-600">✓</span>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div>
+            <label class="text-[8px] font-black uppercase text-gray-400 block mb-1 ml-1">Order Status</label>
+            <select x-model="reportFilter.status" class="w-full border p-2.5 rounded-xl text-[10px] font-bold">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Delivered">Delivered</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="text-[8px] font-black uppercase text-gray-400 block mb-1 ml-1">Product Type</label>
+            <select x-model="reportFilter.productType" class="w-full border p-2.5 rounded-xl text-[10px] font-bold">
+                <option value="">All Types</option>
+                <option value="Product"> Contains Product</option>
+                <option value="Gift">Contains Gift</option>
+            </select>
+        </div>
+
+        <div x-show="reportFilter.customer.length > 0" class="md:col-span-4 mt-2 flex flex-wrap gap-2">
+            <template x-for="name in reportFilter.customer" :key="name">
+                <span class="bg-gray-100 text-[9px] font-black uppercase px-2 py-1 rounded-full flex items-center space-x-2 border border-gray-200">
+                    <span x-text="name"></span>
+                    <button @click="toggleCustFilter(name)" class="text-gray-400 hover:text-red-600">×</button>
+                </span>
+            </template>
+            <button @click="reportFilter.customer = []" class="text-[8px] font-black uppercase text-red-600 hover:underline">Clear Selection</button>
+        </div>
+    </div>
+    
+    <div class="mb-4 text-center text-[10px] font-bold text-gray-400 tracking-widest uppercase bg-zinc-100 p-2 rounded-xl">
+         Found <span class="font-black text-red-600" x-text="filteredOrders.length"></span> matching records
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left min-w-[750px]">
+                <thead class="bg-gray-50 border-b">
+                    <tr>
+                        <th class="p-4 text-[9px] font-black uppercase text-gray-400">Order ID</th>
+                        <th class="p-4 text-[9px] font-black uppercase text-gray-400">Date</th>
+                        <th class="p-4 text-[9px] font-black uppercase text-gray-400">Client</th>
+                        <th class="p-4 text-[9px] font-black uppercase text-gray-400">Product Type</th>
+                        <th class="p-4 text-[9px] font-black uppercase text-gray-400 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    <template x-for="order in filteredOrders" :key="order.id">
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-4 text-[10px] font-black text-blue-600 underline cursor-pointer" @click="viewOrderDetails(order)" x-text="order.id"></td>
+                            <td class="p-4 text-[10px] font-bold text-gray-600" x-text="order.date"></td>
+                            <td class="p-4 text-[10px] font-black uppercase" x-text="order.customer"></td>
+                            <td class="p-4">
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="type in [...new Set(order.items.map(i => i.type))]" :key="type">
+                                        <span :class="type === 'Gift' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'" 
+                                              class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded border" x-text="type"></span>
+                                    </template>
+                                </div>
+                            </td>
+                            <td class="p-4 text-center">
+                                <span :class="{
+                                    'bg-amber-100 text-amber-700': order.status === 'Pending',
+                                    'bg-blue-100 text-blue-700': order.status === 'Shipped',
+                                    'bg-green-100 text-green-700': order.status === 'Delivered'
+                                }" class="text-[8px] font-black uppercase px-2 py-1 rounded-full" x-text="order.status"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+        <section x-show="adminTab === 'inventory'" x-transition>
+            <h2 class="text-[9px] font-black uppercase text-red-600 mb-4 tracking-widest">Inventory & Category Control</h2>
+            
+            <div class="mb-8 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                <h3 class="text-[10px] font-black uppercase mb-4">Manage Global Categories</h3>
+                <div class="flex flex-wrap gap-4 items-end">
+                    <div class="flex-grow max-w-xs">
+                        <input x-model="newCategoryName" type="text" placeholder="New Category Name..." class="w-full border p-3 rounded-xl text-xs font-bold">
+                    </div>
+                    <button @click="addCategory()" class="bg-black text-white px-6 py-3 rounded-xl font-black uppercase text-[9px]" style="background-color: #644117;">Add Category</button>
+                    
+                    <div class="flex flex-wrap gap-2 ml-4">
+                        <template x-for="cat in categories" :key="cat">
+                            <span class="inline-flex items-center bg-gray-100 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase">
+                                <span x-text="cat"></span>
+                                <button @click="deleteCategory(cat)" class="ml-2 text-red-600 hover:text-red-800">✕</button>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm h-fit">
+                    <h3 class="text-[10px] font-black uppercase mb-4">Add New Asset</h3>
+                    <form @submit.prevent="addProduct()" class="space-y-3">
+					        <div class="space-y-2">
+                                <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Product Pictures (Max 3)</label>
+                                <input type="file" accept="image/*" multiple @change="handleImageUpload($event)" class="w-full text-[10px]">  
+                            </div>
+                        
+                        <div class="space-y-1">
+                            <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Asset Type</label>
+                            <select x-model="newProduct.type" class="w-full border p-3 rounded-xl text-xs font-bold bg-white">
+                                <option value="Product">Product</option>
+                                <option value="Gift">Gift</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Category</label>
+                            <select x-model="newProduct.category" class="w-full border p-3 rounded-xl text-xs font-bold bg-white">
+                                <template x-for="cat in categories" :key="cat">
+                                    <option :value="cat" x-text="cat"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <input x-model="newProduct.name" type="text" placeholder="Asset Name" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                        <textarea x-model="newProduct.desc" placeholder="Asset Description" class="w-full border p-3 rounded-xl text-xs font-bold" rows="2"></textarea>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <input x-model.number="newProduct.qty" type="number" placeholder="Qty" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                            <div class="col-span-2 text-[8px] font-black uppercase text-gray-400 ml-1">Price Range (RM)</div>
+                            <input x-model.number="newProduct.minPrice" type="number" step="0.01" placeholder="Min Price" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                            <input x-model.number="newProduct.maxPrice" type="number" step="0.01" placeholder="Max Price" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                        </div>
+                        <button type="submit" class="w-full bg-black text-white py-3 rounded-xl font-black uppercase text-[9px]" style="background-color: #644117;">Add Stock Asset</button>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 bg-white rounded-2xl border overflow-hidden shadow-sm">
+                    <template x-for="p in products" :key="p.id">
+                        <div class="p-4 border-b flex justify-between items-center hover:bg-gray-50">
+                            <div class="max-w-[60%] flex items-center gap-4">
+                                <template x-if="p.images && p.images.length > 0">
+                                    <img :src="p.images[0]" class="w-10 h-10 object-cover rounded border">
+                                </template>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span :class="p.type === 'Gift' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded" x-text="p.type"></span>
+                                        <span class="font-black uppercase text-[10px] block truncate" x-text="p.name"></span>
+                                    </div>
+                                    <span class="text-[8px] text-gray-400 uppercase font-bold" x-text="p.category + ' | Stock: ' + p.qty + ' | RM ' + p.minPrice.toFixed(2) + ' - ' + p.maxPrice.toFixed(2)"></span>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button @click="startEdit(p)" class="text-blue-600 font-black text-[9px] uppercase">Modify</button>
+                                <button @click="deleteProduct(p.id)" class="text-red-600 font-black text-[9px] uppercase">Delete</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <section x-show="adminTab === 'crm'" x-transition>
+            <h2 class="text-[9px] font-black uppercase text-blue-600 mb-4 tracking-widest">Customer CRM</h2>
+            <div class="grid lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm h-fit">
+                    <h3 class="text-[10px] font-black uppercase mb-4">Register New Client</h3>
+                    <form @submit.prevent="createCustomer()" class="space-y-4">
+                        <input x-model="newCustomer.company" type="text" placeholder="Company Name" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                        <input x-model="newCustomer.email" type="email" placeholder="Email Address" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                        <input x-model="newCustomer.password" type="password" placeholder="Account Password" required class="w-full border p-3 rounded-xl text-xs font-bold">
+                        
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center ml-1">
+                                <label class="text-[8px] font-black uppercase text-gray-400">Select Segments</label>
+                                <button type="button" @click="toggleAllCategories('new')" class="text-[8px] font-black uppercase text-blue-600 underline">
+                                    <span x-text="newCustomer.category.length === categories.length ? 'Clear All' : 'Select All'"></span>
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 p-3 border rounded-xl bg-white max-h-40 overflow-y-auto">
+                                <template x-for="cat in categories" :key="cat">
+                                    <label class="flex items-center space-x-2 cursor-pointer group">
+                                        <input type="checkbox" 
+                                               :checked="newCustomer.category.includes(cat)"
+                                               @change="toggleCategory(cat, 'new')"
+                                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3">
+                                        <span class="text-[10px] font-bold text-gray-700 group-hover:text-blue-600" x-text="cat"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-black uppercase text-[9px]" style="background-color: #644117;">Register Profile</button>
+                    </form>
+                </div>
+                <div class="lg:col-span-2 bg-white rounded-2xl border overflow-hidden shadow-sm">
+                    <template x-for="c in customers" :key="c.id">
+                        <div class="p-4 border-b flex justify-between items-center hover:bg-gray-50">
+                            <div class="max-w-[60%]">
+                                <span class="font-black uppercase text-[10px] block truncate" x-text="c.company"></span>
+                                <div class="flex flex-wrap items-center gap-2 mt-1">
+                                    <span class="text-[8px] text-gray-400 font-bold" x-text="c.email"></span>
+                                    <template x-for="cat in (Array.isArray(c.category) ? c.category : [c.category])">
+                                        <span class="text-[7px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase" x-text="cat"></span>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button @click="startCustomerEdit(c)" class="text-blue-600 font-black text-[9px] uppercase">Modify</button>
+                                <button @click="deleteCustomer(c.id)" class="text-red-600 font-black text-[9px] uppercase">Remove</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+
+    <main x-show="view === 'store'" x-cloak class="flex-grow py-8 md:py-16 bg-gray-50 px-4 md:px-6">
+        <div class="max-w-7xl mx-auto">
+            <h1 class="text-2xl md:text-3xl font-black uppercase mb-8 tracking-tighter">Product Catalog</h1>
+            
+            <div class="flex mb-4 border-b border-gray-200">
+                <button @click="selectedAssetType = 'Product'" 
+                        :class="selectedAssetType === 'Product' ? 'border-b-4 border-black text-black' : 'text-gray-400 hover:text-black'"
+                        class="pb-2 px-6 text-[10px] font-black uppercase tracking-widest transition-all">
+                    Products
+                </button>
+                <button @click="selectedAssetType = 'Gift'" 
+                        :class="selectedAssetType === 'Gift' ? 'border-b-4 border-purple-600 text-purple-600' : 'text-gray-400 hover:text-purple-600'"
+                        class="pb-2 px-6 text-[10px] font-black uppercase tracking-widest transition-all">
+                    Gifts
+                </button>
+            </div>
+
+            <div class="mb-10 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+                <label class="text-[10px] font-black uppercase text-gray-400 block mb-4 tracking-widest">Select Segments</label>
+                <div class="flex flex-wrap gap-6">
+                    <label class="flex items-center space-x-3 cursor-pointer group">
+                        <input type="radio" name="catFilter" value="All" x-model="selectedCategory" class="w-4 h-4 text-black border-gray-300 focus:ring-black">
+                        <span class="text-xs font-black uppercase tracking-tight group-hover:text-red-600 transition" :class="selectedCategory === 'All' ? 'text-red-600' : 'text-gray-700'">All Segments</span>
+                    </label>
+                    <template x-for="cat in (isLoggedIn && !isAdmin ? (Array.isArray(customers.find(c => c.company === currentUser).category) ? customers.find(c => c.company === currentUser).category : [customers.find(c => c.company === currentUser).category]) : categories)" :key="cat">
+                        <label class="flex items-center space-x-3 cursor-pointer group">
+                            <input type="radio" name="catFilter" :value="cat" x-model="selectedCategory" class="w-4 h-4 text-black border-gray-300 focus:ring-black">
+                            <span class="text-xs font-black uppercase tracking-tight group-hover:text-red-600 transition" :class="selectedCategory === cat ? 'text-red-600' : 'text-gray-700'" x-text="cat"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+<template x-for="product in products.filter(p => {
+    const matchesSelectedCat = selectedCategory === 'All' || p.category === selectedCategory;
+    const matchesAssetType = p.type === selectedAssetType;
+    let matchesPermission = true;
+    if (isLoggedIn && !isAdmin) {
+        const client = customers.find(c => c.company === currentUser);
+        if (client) {
+            const allowedCats = Array.isArray(client.category) ? client.category : [client.category];
+            matchesPermission = allowedCats.includes(p.category);
+        }
+    }
+    return matchesSelectedCat && matchesAssetType && matchesPermission;
+})" :key="product.id">
+    <div class="bg-white border p-6 md:p-8 rounded-2xl md:rounded-3xl shadow-sm hover:shadow-lg transition flex flex-col relative">
+        
+        <template x-if="product.images && product.images.length > 0">
+            <div class="relative group mb-4">
+                <div :id="'carousel-' + product.id" 
+                     class="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar rounded-xl border border-gray-100 h-48 bg-gray-50">
+                    <template x-for="(img, index) in product.images" :key="index">
+                        <div class="flex-none w-full snap-center flex items-center justify-center">
+                            <img :src="img" class="w-full h-full object-cover">
+                        </div>
+                    </template>
+                </div>
+                
+                <template x-if="product.images.length > 1">
+                    <div class="absolute inset-0 flex items-center justify-between px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button @click="document.getElementById('carousel-' + product.id).scrollBy({left: -200, behavior: 'smooth'})" 
+                                class="bg-white/80 p-1.5 rounded-full shadow-md hover:bg-white text-black font-black text-xs">&larr;</button>
+                        <button @click="document.getElementById('carousel-' + product.id).scrollBy({left: 200, behavior: 'smooth'})" 
+                                class="bg-white/80 p-1.5 rounded-full shadow-md hover:bg-white text-black font-black text-xs">&rarr;</button>
+                    </div>
+                </template>
+                
+                <template x-if="product.images.length > 1">
+                    <div class="absolute bottom-2 right-2 bg-black/60 text-white text-[8px] px-2 py-1 rounded-full font-black uppercase tracking-widest">
+                        <span x-text="product.images.length"></span> Photos
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <div class="flex items-center gap-2 mb-2">
+            <span :class="product.type === 'Gift' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded" x-text="product.type"></span>
+            <span class="text-[9px] font-black text-red-600 uppercase" x-text="product.category"></span>
+        </div>
+        <h3 class="text-lg md:text-xl font-black uppercase mb-3" x-text="product.name"></h3>
+        <p class="text-zinc-500 text-[11px] mb-6 flex-grow" x-text="product.desc"></p>
+        
+        <div class="flex justify-between items-center mt-auto pt-4 border-t gap-2">
+            <div class="flex flex-col">
+                <span class="text-[8px] font-black text-gray-400 uppercase">Estimated Range</span>
+                
+                <template x-if="isLoggedIn || isAdmin">
+                    <span class="text-sm md:text-lg font-black" x-text="'RM' + product.minPrice.toFixed(2) + ' - ' + product.maxPrice.toFixed(2)"></span>
+                </template>
+                <template x-if="!isLoggedIn && !isAdmin">
+                    <span class="text-[9px] bg-gray-100 text-gray-400 px-2 py-1 rounded-lg font-black uppercase mt-1">Login to View Price</span>
+                </template>
+            </div>
+            
+
+
+                <button @click="isLoggedIn ? addToCart(product) : (view = 'login')" 
+                     class="w-full text-white px-5 py-3 rounded-xl font-black uppercase text-[9px]" 
+                        style="background-color: #644117;">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+</template>
+            </div>
+
+            <template x-if="products.filter(p => (selectedCategory === 'All' || p.category === selectedCategory) && p.type === selectedAssetType).length === 0">
+                <div class="text-center py-20">
+                    <p class="text-[10px] font-black uppercase text-gray-400 tracking-widest">No assets found matching these requirements.</p>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <main x-show="view === 'cart'" x-cloak class="flex-grow py-8 md:py-16 bg-gray-50 px-4">
+        <div class="max-w-3xl mx-auto">
+            <h1 class="text-2xl font-black uppercase mb-8 tracking-tighter">Your Orders</h1>
+            
+            <div class="bg-white border rounded-2xl overflow-hidden shadow-sm">
+                <template x-if="cart.length === 0">
+                    <div class="p-12 text-center">
+                        <p class="text-[10px] font-black uppercase text-gray-400 mb-4 tracking-widest">Orders is empty</p>
+                        <button @click="view = 'store'" class="text-black border-b-2 border-black font-black uppercase text-[10px] tracking-widest">Return to Products</button>
+                    </div>
+                </template>
+
+                <template x-if="cart.length > 0">
+                    <div>
+                        <template x-for="item in cart" :key="item.id">
+                            <div class="p-6 border-b flex justify-between items-center">
+                                <div class="flex items-center gap-4">
+                                    <template x-if="item.images && item.images.length > 0">
+                                        <img :src="item.images[0]" class="w-12 h-12 object-cover rounded border">
+                                    </template>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span :class="item.type === 'Gift' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="text-[7px] font-black uppercase px-1.5 py-0.5 rounded" x-text="item.type"></span>
+                                            <span class="text-[8px] font-black text-red-600 uppercase tracking-widest" x-text="item.category"></span>
+                                        </div>
+                                        <h3 class="font-black uppercase text-sm" x-text="item.name"></h3>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <span class="text-[10px] font-bold" x-text="'RM' + item.minPrice.toFixed(2) + ' - ' + item.maxPrice.toFixed(2)"></span>
+                                            <div class="flex items-center border rounded-lg overflow-hidden">
+                                                <button @click="item.cartQty > 1 ? item.cartQty-- : removeFromCart(item.id)" class="px-2 py-1 text-xs font-black bg-gray-50 hover:bg-gray-100">-</button>
+                                                <span class="px-3 py-1 text-[10px] font-black border-x bg-white" x-text="item.cartQty"></span>
+                                                <button @click="item.cartQty++" class="px-2 py-1 text-xs font-black bg-gray-50 hover:bg-gray-100">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <button @click="removeFromCart(item.id)" class="text-[8px] font-black text-gray-400 uppercase hover:text-red-600 transition">Remove</button>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="p-6 bg-gray-50 flex justify-between items-center">
+                            <p class="text-[9px] font-black text-gray-500 uppercase italic">Prices shown are estimates based on standard ranges.</p>
+                            <button @click="submitOrder()" class="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 transition" style="background-color: #644117;">Submit Order</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </main>
+
+    <div x-show="editMode || customerEditMode || showOrderDetails" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+        
+        <template x-if="showOrderDetails">
+            <div class="bg-white w-full max-w-md rounded-2xl p-6 md:p-8 overflow-y-auto max-h-[85vh]">
+                <div class="flex justify-between items-start mb-6 font-black uppercase">
+                    <div class="flex flex-col">
+                        <h2 class="text-base" x-text="selectedOrder?.id"></h2>
+                        <span class="text-[10px] text-gray-400" x-text="'Status: ' + selectedOrder?.status"></span>
+                    </div>
+                    <button @click="showOrderDetails = false" class="text-2xl leading-none">&times;</button>
+                </div>
+                
+                <div class="space-y-4 border-t pt-4">
+                    <template x-for="item in selectedOrder?.items" :key="item.name">
+                        <div class="flex justify-between items-center text-[10px] font-bold uppercase border-b pb-3 border-gray-50">
+                            <div class="flex flex-col">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span :class="item.type === 'Gift' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="text-[6px] font-black uppercase px-1 py-0.5 rounded" x-text="item.type"></span>
+                                    <span x-text="item.name"></span>
+                                </div>
+                                <span class="text-[8px] text-gray-400 italic" x-text="'Range: RM' + (item.minPrice?.toFixed(2) || '0.00') + ' - ' + (item.maxPrice?.toFixed(2) || '0.00')"></span>
+                            </div>
+                            <div class="flex items-center space-x-6">
+                                <div class="flex flex-col items-center">
+                                    <span class="text-[7px] text-gray-400 mb-0.5">Quantity</span>
+                                    
+                                    <template x-if="isAdmin && adminTab === 'orders' && selectedOrder.status === 'Pending'">
+                                        <input type="number" 
+                                               :value="item.qty" 
+                                               @input="updateAdminItemQty(selectedOrder.id, item.name, $event.target.value)"
+                                               class="w-12 border rounded text-center font-black text-sm bg-gray-50">
+                                    </template>
+                                    
+                                    <template x-if="!isAdmin || adminTab === 'reports' || selectedOrder.status !== 'Pending'">
+                                        <span class="font-black text-sm" x-text="item.qty"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <template x-if="isAdmin && adminTab === 'orders' && selectedOrder.status === 'Pending'">
+                        <div class="bg-blue-50 p-3 rounded-lg border border-dashed border-blue-200 mt-4">
+                            <p class="text-[8px] text-blue-600 uppercase text-center font-black">
+                                Admin Mode: Quantities updated here will reflect in the ledger immediately.
+                            </p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="editMode">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-6 md:p-8 overflow-y-auto max-h-[90vh]">
+                <h2 class="font-black uppercase mb-6 text-base italic">Modify Asset</h2>
+                <div class="space-y-3">
+                    <div class="space-y-2">
+                        <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Update Pictures (Max 3)</label>
+                        <input type="file" accept="image/*" multiple @change="handleImageUpload($event, 'edit')" class="w-full text-[10px]">
+                        
+                        <div class="flex gap-2 mt-2">
+                            <template x-for="img in editingProduct.images" :key="img">
+                                <img :src="img" class="w-12 h-12 object-cover rounded border border-gray-200">
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Asset Type</label>
+                        <select x-model="editingProduct.type" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                            <option value="Product">Product</option>
+                            <option value="Gift">Gift</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Category</label>
+                        <select x-model="editingProduct.category" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                            <template x-for="cat in categories" :key="cat">
+                                <option :value="cat" x-text="cat"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <input x-model="editingProduct.name" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                    <textarea x-model="editingProduct.desc" class="w-full border p-3 rounded-xl text-[11px] font-bold" rows="2"></textarea>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="col-span-2 text-[8px] font-black uppercase text-gray-400 ml-1">Stock & Price Range (RM)</div>
+                        <input x-model.number="editingProduct.qty" type="number" placeholder="Qty" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                        <div class="invisible"></div>
+                        <input x-model.number="editingProduct.minPrice" type="number" step="0.01" placeholder="Min Price" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                        <input x-model.number="editingProduct.maxPrice" type="number" step="0.01" placeholder="Max Price" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                    </div>
+                    
+                    <div class="flex space-x-2 pt-4">
+                        <button @click="editMode = false" class="flex-1 bg-gray-100 py-3 rounded-xl font-black text-[9px]">Cancel</button>
+                        <button @click="saveEdit()" class="flex-1 bg-black text-white py-3 rounded-xl font-black text-[9px]" style="background-color: #644117;">Update</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="customerEditMode">
+            <div class="bg-white w-full max-w-sm rounded-2xl p-6 md:p-8">
+                <h2 class="font-black uppercase mb-6 text-base italic">Modify Client Profile</h2>
+                <div class="space-y-4">
+                    <div class="space-y-1">
+                        <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Company</label>
+                        <input x-model="editingCustomer.company" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Email Address</label>
+                        <input x-model="editingCustomer.email" type="email" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[8px] font-black uppercase text-gray-400 ml-1">Security Password</label>
+                        <input x-model="editingCustomer.password" type="text" class="w-full border p-3 rounded-xl text-[11px] font-bold">
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center ml-1">
+                            <label class="text-[8px] font-black uppercase text-gray-400">Assigned Catalogs</label>
+                            <button type="button" @click="toggleAllCategories('edit')" class="text-[8px] font-black uppercase text-blue-600 underline">
+                                <span x-text="editingCustomer.category.length === categories.length ? 'Clear All' : 'Select All'"></span>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 p-3 border rounded-xl bg-gray-50 max-h-40 overflow-y-auto">
+                            <template x-for="cat in categories" :key="cat">
+                                <label class="flex items-center space-x-2 cursor-pointer group">
+                                    <input type="checkbox" 
+                                           :checked="editingCustomer.category.includes(cat)"
+                                           @change="toggleCategory(cat, 'edit')"
+                                           class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3">
+                                    <span class="text-[10px] font-bold text-gray-700 group-hover:text-blue-600" x-text="cat"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-2 pt-4">
+                        <button @click="customerEditMode = false" class="flex-1 bg-gray-100 py-3 rounded-xl font-black text-[9px]">Cancel</button>
+                        <button @click="saveCustomerEdit()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-[9px]" style="background-color: #644117;">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </template>						  
+    </div>
+<div x-show="isLoggedIn && !isAdmin && cart.length > 0" 
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="translate-y-full"
+     x-transition:enter-end="translate-y-0"
+     class="fixed bottom-0 left-0 right-0 z-40 p-4">
+    <div class="max-w-7xl mx-auto">
+        <button @click="view = 'cart'" 
+                class="w-full bg-black text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center hover:bg-zinc-800 transition-all border border-zinc-700"
+                style="background-color: #644117;">
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                    </svg>
+                    <span class="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white" x-text="cart.length"></span>
+                </div>
+                <span class="text-[10px] font-black uppercase tracking-widest">Review Selected Items</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-[10px] font-black uppercase">View Cart</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </div>
+        </button>
+    </div>
+</div>
+<footer class="py-10 text-center text-[8px] md:text-[10px] uppercase tracking-[0.3em] mt-auto px-4" style="background-color: #ffd700;">
+    &copy; 2026 SKTOP Management Terminal | All Rights Reserved.
+</footer>
+</body>
+</html>

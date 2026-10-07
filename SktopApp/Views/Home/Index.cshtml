@@ -1,0 +1,56 @@
+@{
+    Layout = null;
+}
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var antiForgeryTokens = Antiforgery.GetAndStoreTokens(Context);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKTOP | Industrial Management Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="~/css/sktop.css" asp-append-version="true" />
+    <style>
+        [x-cloak] { display: none !important; }
+        .bg-sktop-silver { background: linear-gradient(to bottom, #f8f9fa 0%, #d1d5db 100%); border: 1px solid #9ca3af; }
+        .hero-overlay { background: linear-gradient(rgba(229,225,230,0.4), rgba(229,225,230,0.2)); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .whatsapp-float {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .whatsapp-float:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans antialiased text-slate-900 flex flex-col min-h-screen">
+    <div id="sktop-app-root" class="flex-grow flex items-center justify-center">
+        <div class="text-[10px] font-black uppercase text-gray-400 tracking-widest">Loading...</div>
+    </div>
+    <script>
+        window.__SKTOP_PROPS__ = {
+            baseUrl: '@Url.Content("~/")',
+            imageBaseUrl: '@Url.Content("~/images/")',
+            initialProducts: @Html.Raw(ViewData["InitialProductsJson"]?.ToString() ?? "null"),
+            initialOrders: @Html.Raw(ViewData["InitialOrdersJson"]?.ToString() ?? "null"),
+            userCategories: @Html.Raw(ViewData["UserCategoriesJson"]?.ToString() ?? "null"),
+            availableSegments: @Html.Raw(ViewData["AvailableSegmentsJson"]?.ToString() ?? "null"),
+            adminBootstrap: @Html.Raw(ViewData["AdminBootstrapJson"]?.ToString() ?? "null"),
+            auth: @Html.Raw(ViewData["AuthJson"]?.ToString() ?? "null"),
+            antiForgery: {
+                headerName: '@(antiForgeryTokens.HeaderName ?? string.Empty)',
+                requestToken: '@(antiForgeryTokens.RequestToken ?? string.Empty)',
+                formFieldName: '@(antiForgeryTokens.FormFieldName ?? string.Empty)'
+            }
+        };
+    </script>
+    <script type="module" src="~/js/sktop-app.js" asp-append-version="true"></script>
+</body>
+</html>

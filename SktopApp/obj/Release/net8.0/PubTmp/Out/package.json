@@ -1,0 +1,22 @@
+{
+  "name": "sktopapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm run build-css && npm run build:react-app",
+    "build-css": "tailwindcss -i ./wwwroot/css/tailwind.css -o ./wwwroot/css/tailwind-output.css",
+    "build-css:watch": "tailwindcss -i ./wwwroot/css/tailwind.css -o ./wwwroot/css/tailwind-output.css --watch",
+    "build:react-app": "cd ClientApp/react-app && npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  },
+  "dependencies": {
+    "vite": "^8.0.8"
+  }
+}

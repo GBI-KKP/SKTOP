@@ -1,0 +1,19 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: path.resolve(__dirname, '../../wwwroot/js'),
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        'sktop-app': path.resolve(__dirname, 'src/sktop.jsx'),
+      },
+      output: {
+        entryFileNames: '[name].js',
+      },
+    },
+  },
+});

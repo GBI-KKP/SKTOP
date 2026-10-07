@@ -1,0 +1,42 @@
+@{
+    ViewData["Title"] = "Login";
+    Layout = null;
+}
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    var antiForgeryTokens = Antiforgery.GetAndStoreTokens(Context);
+    var loginError = ViewData["Error"]?.ToString();
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKTOP | Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="~/css/sktop.css" asp-append-version="true" />
+</head>
+<body class="bg-gray-50 font-sans antialiased text-slate-900 flex flex-col min-h-screen">
+    <div id="sktop-app-root" class="flex-grow flex items-center justify-center">
+        <div class="text-[10px] font-black uppercase text-gray-400 tracking-widest">Loading...</div>
+    </div>
+    <script>
+        window.__SKTOP_PROPS__ = {
+            baseUrl: '@Url.Content("~/")',
+            imageBaseUrl: '@Url.Content("~/images/")',
+            initialProducts: null,
+            auth: @Html.Raw(ViewData["AuthJson"]?.ToString() ?? "null"),
+            loginError: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(loginError)),
+            initialView: 'login',
+            antiForgery: {
+                headerName: '@(antiForgeryTokens.HeaderName ?? string.Empty)',
+                requestToken: '@(antiForgeryTokens.RequestToken ?? string.Empty)',
+                formFieldName: '@(antiForgeryTokens.FormFieldName ?? string.Empty)'
+            }
+        };
+    </script>
+    <script type="module" src="~/js/sktop-app.js" asp-append-version="true"></script>
+</body>
+</html>

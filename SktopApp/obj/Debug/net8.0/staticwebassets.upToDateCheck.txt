@@ -1,0 +1,7 @@
+wwwroot\css\site.css
+wwwroot\css\tailwind-output.css
+wwwroot\css\tailwind.css
+wwwroot\images\carBanner2.jpg
+wwwroot\js\site.js
+wwwroot\css\sktop.css
+wwwroot\js\sktop-app.js
